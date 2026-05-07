@@ -401,7 +401,6 @@ class MainApplication:
         self.tree.selection_set(item_id)
         self.tree.focus(item_id)
         if self._column_name(column_id) == "value":
-            self.start_inline_value_edit(item_id, open_choices=True)
             return "break"
         self.edit_rule_by_item_id(item_id)
         return "break"
@@ -415,7 +414,9 @@ class MainApplication:
             return None
         self.tree.selection_set(item_id)
         self.tree.focus(item_id)
-        self.start_inline_value_edit(item_id, open_choices=True)
+        if self.inline_value_editor is not None and self.inline_value_item_id == item_id:
+            return "break"
+        self.start_inline_value_edit(item_id, open_choices=True, save_existing=True)
         return "break"
 
     def edit_selected_value_inline(self, _event: tk.Event | None = None) -> str | None:
@@ -424,12 +425,12 @@ class MainApplication:
             selected = self.tree.selection()
             item_id = selected[0] if selected else ""
         if item_id:
-            self.start_inline_value_edit(item_id, open_choices=True)
+            self.start_inline_value_edit(item_id, open_choices=True, save_existing=True)
             return "break"
         return None
 
-    def start_inline_value_edit(self, item_id: str, open_choices: bool = False) -> None:
-        self.close_inline_value_editor(save=False)
+    def start_inline_value_edit(self, item_id: str, open_choices: bool = False, save_existing: bool = False) -> None:
+        self.close_inline_value_editor(save=save_existing)
         try:
             index = int(item_id)
         except ValueError:
