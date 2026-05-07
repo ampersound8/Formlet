@@ -458,9 +458,6 @@ class MainApplication:
         column_id = self.tree.identify_column(event.x)
         if self._column_name(column_id) != "value":
             return None
-        self.tree.selection_set(item_id)
-        self.tree.focus(item_id)
-        self.load_value_editor_by_item_id(item_id)
         self.focus_current_value_editor()
         return "break"
 
