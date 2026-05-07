@@ -53,7 +53,8 @@ HELP_TEXT = """Formlet の使い方
 入力値抽出の使い方
 
 1. 対象フォームに一度手入力します。
-2. Formletで「入力値抽出Bookmarklet生成」を押します。Bookmarkletは自動でコピーされます。
+2. Formletで「入力欄読取Bookmarklet生成」を押します。Bookmarkletは自動でコピーされます。
+   これは入力欄読み取り用のBookmarkletです。
 3. ブラウザのブックマークURL欄に貼り付け、対象ページで実行します。
 4. 入力済み項目のJSONがクリップボードにコピーされます。
 5. JSONを .json ファイルとして保存します。
@@ -244,7 +245,7 @@ class MainApplication:
             ("行複製", self.duplicate_rule),
             ("Bookmarklet生成", lambda: self.generate_bookmarklet(False)),
             ("検査Bookmarklet生成", lambda: self.generate_bookmarklet(True)),
-            ("入力値抽出Bookmarklet生成", self.generate_extract_bookmarklet),
+            ("入力欄読取Bookmarklet生成", self.generate_extract_bookmarklet),
             ("コピー", self.copy_bookmarklet),
         ]
         for label, command in buttons:
@@ -276,6 +277,7 @@ class MainApplication:
         xscroll.grid(row=1, column=0, sticky="ew")
         tree_frame.rowconfigure(0, weight=1)
         tree_frame.columnconfigure(0, weight=1)
+        self.tree.bind("<ButtonRelease-1>", self.edit_value_at_event)
         self.tree.bind("<Double-1>", self.edit_rule_at_event)
         self.tree.bind("<Return>", self.edit_selected_rule)
         self.tree.bind("<F2>", self.edit_selected_value_inline)
@@ -398,9 +400,21 @@ class MainApplication:
         self.tree.selection_set(item_id)
         self.tree.focus(item_id)
         if self._column_name(column_id) == "value":
-            self.root.after_idle(lambda: self.start_inline_value_edit(item_id))
+            self.start_inline_value_edit(item_id, open_choices=True)
             return "break"
-        self.root.after_idle(lambda: self.edit_rule_by_item_id(item_id))
+        self.edit_rule_by_item_id(item_id)
+        return "break"
+
+    def edit_value_at_event(self, event: tk.Event) -> str | None:
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            return None
+        column_id = self.tree.identify_column(event.x)
+        if self._column_name(column_id) != "value":
+            return None
+        self.tree.selection_set(item_id)
+        self.tree.focus(item_id)
+        self.start_inline_value_edit(item_id, open_choices=True)
         return "break"
 
     def edit_selected_value_inline(self, _event: tk.Event | None = None) -> str | None:
@@ -409,11 +423,11 @@ class MainApplication:
             selected = self.tree.selection()
             item_id = selected[0] if selected else ""
         if item_id:
-            self.start_inline_value_edit(item_id)
+            self.start_inline_value_edit(item_id, open_choices=True)
             return "break"
         return None
 
-    def start_inline_value_edit(self, item_id: str) -> None:
+    def start_inline_value_edit(self, item_id: str, open_choices: bool = False) -> None:
         self.close_inline_value_editor(save=False)
         try:
             index = int(item_id)
@@ -432,6 +446,8 @@ class MainApplication:
             self.inline_value_editor = ttk.Combobox(self.tree, values=value_options, state="readonly")
             self.inline_value_editor.set(self.rules[index].value if self.rules[index].value else value_options[0])
             self.inline_value_editor.bind("<<ComboboxSelected>>", lambda _event: self.close_inline_value_editor(save=True))
+            if open_choices:
+                self.root.after(60, self.open_inline_value_choices)
         else:
             self.inline_value_editor = ttk.Entry(self.tree)
             self.inline_value_editor.insert(0, self.rules[index].value)
@@ -441,6 +457,15 @@ class MainApplication:
         self.inline_value_editor.bind("<Return>", lambda _event: self.close_inline_value_editor(save=True))
         self.inline_value_editor.bind("<Escape>", lambda _event: self.close_inline_value_editor(save=False))
         self.inline_value_editor.bind("<FocusOut>", lambda _event: self.close_inline_value_editor(save=True))
+
+    def open_inline_value_choices(self) -> None:
+        editor = self.inline_value_editor
+        if not isinstance(editor, ttk.Combobox):
+            return
+        try:
+            self.root.tk.call("ttk::combobox::Post", str(editor))
+        except tk.TclError:
+            editor.event_generate("<Button-1>")
 
     def close_inline_value_editor(self, save: bool) -> None:
         editor = self.inline_value_editor
