@@ -1,0 +1,23 @@
+name: 品目登録フォーム
+description: 社内システム用
+rules:
+- enabled: true
+  label: 品目名
+  selector: "#mtlItemName"
+  kind: text
+  value: "テスト"
+  checked:
+  mode: replace
+  source: html
+  note: ""
+- enabled: true
+  label: 備考
+  selector: "textarea.memo"
+  kind: textarea
+  value: |
+    設備確認を実施しました。
+    異常はありません。
+  checked:
+  mode: replace
+  source: manual
+  note: ""
