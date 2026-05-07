@@ -165,7 +165,11 @@ class BookmarkletBuilder:
           }
           function selectorFor(element) {
             const tag = element.tagName.toLowerCase();
+            const type = (element.getAttribute("type") || (tag === "select" ? "select" : tag)).toLowerCase();
             if (element.id) return "#" + cssEscape(element.id);
+            if ((type === "checkbox" || type === "radio") && element.name && element.hasAttribute("value")) {
+              return tag + "[name=\"" + attrEscape(element.name) + "\"][value=\"" + attrEscape(element.value || "") + "\"]";
+            }
             if (element.name) return tag + "[name=\"" + attrEscape(element.name) + "\"]";
             if (element.placeholder) return tag + "[placeholder=\"" + attrEscape(element.placeholder) + "\"]";
             if (element.classList && element.classList.length) return tag + "." + cssEscape(element.classList[0]);
@@ -183,10 +187,11 @@ class BookmarkletBuilder:
                 id: element.id || "",
                 name: element.name || "",
                 value: element.value || "",
+                hasValueAttribute: element.hasAttribute("value"),
                 checked: type === "checkbox" || type === "radio" ? Boolean(element.checked) : null
               };
             })
-            .filter(item => item.value !== "" || item.checked === true);
+            .filter(item => item.type === "checkbox" || item.type === "radio" ? item.checked === true : item.value !== "");
           const text = JSON.stringify(items, null, 2);
           function fallback() {
             prompt("抽出JSONをコピーしてください", text);

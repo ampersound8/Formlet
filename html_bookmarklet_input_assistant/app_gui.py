@@ -686,15 +686,16 @@ class MainApplication:
         for incoming in incoming_rules:
             if incoming.selector and incoming.selector in existing_by_selector:
                 existing = existing_by_selector[incoming.selector]
-                existing.enabled = incoming.enabled
-                existing.label = incoming.label or existing.label
-                existing.kind = incoming.kind or existing.kind
+                if incoming.source != "extracted":
+                    existing.enabled = incoming.enabled
+                    existing.label = incoming.label or existing.label
+                    existing.kind = incoming.kind or existing.kind
+                    existing.mode = incoming.mode or existing.mode
+                    existing.note = incoming.note
+                    if incoming.source not in {"yaml", "extracted"}:
+                        existing.source = incoming.source
                 existing.value = incoming.value
                 existing.checked = incoming.checked
-                existing.mode = incoming.mode or existing.mode
-                existing.note = incoming.note
-                if incoming.source not in {"yaml", "extracted"}:
-                    existing.source = incoming.source
             else:
                 new_rule = incoming.clone()
                 if new_rule.source in {"", "manual", "yaml"}:
@@ -782,8 +783,20 @@ class MainApplication:
             selector = str(item.get("selector", "") or "")
             tag = str(item.get("tag", "") or "")
             input_type = str(item.get("type", "") or "")
+            value = str(item.get("value", "") or "")
+            name = str(item.get("name", "") or "")
+            if input_type == "radio" and name and value and "[value=" not in selector:
+                selector = f'input[name="{self._css_attribute_escape(name)}"][value="{self._css_attribute_escape(value)}"]'
+            elif (
+                input_type == "checkbox"
+                and name
+                and value
+                and item.get("hasValueAttribute") is True
+                and "[value=" not in selector
+            ):
+                selector = f'input[name="{self._css_attribute_escape(name)}"][value="{self._css_attribute_escape(value)}"]'
             kind = self._kind_from_extracted(tag, input_type)
-            label = str(item.get("name") or item.get("id") or selector)
+            label = str(name or item.get("id") or selector)
             checked = item.get("checked")
             if checked not in (True, False, None):
                 checked = None
@@ -793,7 +806,7 @@ class MainApplication:
                     label=label,
                     selector=selector,
                     kind=kind,
-                    value=str(item.get("value", "") or ""),
+                    value=value,
                     checked=checked,
                     mode="replace",
                     source="extracted",
@@ -813,3 +826,6 @@ class MainApplication:
         if input_type == "radio":
             return "radio"
         return "text"
+
+    def _css_attribute_escape(self, value: str) -> str:
+        return value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\a ")
