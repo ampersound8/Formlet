@@ -36,10 +36,10 @@ HELP_TEXT = """Formlet の使い方
 2. Formletを起動して「HTMLを開く」を押します。
    input / textarea / select が一覧に表示されます。
 
-3. 行をダブルクリックして入力値を設定します。
-   value に入力したい文字列を入れます。selector や label も手動編集できます。
+3. 行を選択して、表の下にある「value編集」で入力値を設定します。
+   value に入力したい文字列を入れます。selector や label は行のダブルクリックで手動編集できます。
    select は option の value、radio は選択したい value、checkbox は true/false/on/off/1/0 などを value に入れられます。
-   valueセルを直接ダブルクリックすると、select / radio / checkbox は候補からインライン選択できます。
+   select / radio / checkbox は候補がある場合だけ、value編集エリアで選択できます。
 
 4. 「検査Bookmarklet生成」を押して「コピー」します。
    ブラウザのブックマークURL欄に貼り付け、対象ページで実行すると selector の検出結果だけ確認できます。
@@ -82,8 +82,8 @@ HELP_TEXT = """Formlet の使い方
    </html>
 
 2. Formletで sample_form.html を「HTMLを開く」から読み込みます。
-3. #mtlItemName の行をダブルクリックし、value に「テスト」と入力して保存します。
-4. textarea[name="memo"] または textarea.memo の行にメモ文を入力します。
+3. #mtlItemName の行を選択し、下の value編集 に「テスト」と入力します。
+4. textarea[name="memo"] または textarea.memo の行を選択し、メモ文を入力します。
 5. select の value に「B」、checkbox の value に「true」、radio の value に「urgent」を入力します。
 6. 「検査Bookmarklet生成」から検出確認をします。
 7. 「Bookmarklet生成」から自動入力用Bookmarkletを作ります。
@@ -217,9 +217,12 @@ class MainApplication:
         self.settings_name = ""
         self.settings_description = ""
         self.generated_bookmarklet = ""
-        self.inline_value_editor: tk.Widget | None = None
-        self.inline_value_item_id = ""
-        self.inline_value_by_display: dict[str, str] = {}
+        self.current_value_rule_index: int | None = None
+        self.value_editor_loading = False
+        self.value_choice_by_display: dict[str, str] = {}
+        self.value_editor_target_var = tk.StringVar(value="行を選択してください")
+        self.value_entry_var = tk.StringVar()
+        self.value_choice_var = tk.StringVar()
 
         self.parser = HtmlFormParser()
         self.yaml_service = FormSettingsYaml()
@@ -278,10 +281,50 @@ class MainApplication:
         xscroll.grid(row=1, column=0, sticky="ew")
         tree_frame.rowconfigure(0, weight=1)
         tree_frame.columnconfigure(0, weight=1)
-        self.tree.bind("<ButtonRelease-1>", self.edit_value_at_event)
+        self.tree.bind("<<TreeviewSelect>>", self.load_value_editor_from_selection)
+        self.tree.bind("<ButtonRelease-1>", self.focus_value_editor_at_event)
         self.tree.bind("<Double-1>", self.edit_rule_at_event)
         self.tree.bind("<Return>", self.edit_selected_rule)
-        self.tree.bind("<F2>", self.edit_selected_value_inline)
+        self.tree.bind("<F2>", self.focus_selected_value_editor)
+
+        value_frame = ttk.LabelFrame(self.root, text="value編集", padding=8)
+        value_frame.pack(side=tk.TOP, fill=tk.X, padx=8, pady=(0, 8))
+        value_frame.columnconfigure(1, weight=1)
+        ttk.Label(value_frame, textvariable=self.value_editor_target_var).grid(
+            row=0,
+            column=0,
+            columnspan=4,
+            sticky="w",
+            pady=(0, 4),
+        )
+        ttk.Label(value_frame, text="value").grid(row=1, column=0, sticky="w", padx=(0, 6))
+
+        self.value_entry = ttk.Entry(value_frame, textvariable=self.value_entry_var)
+        self.value_entry.grid(row=1, column=1, sticky="ew")
+        self.value_entry.bind("<KeyRelease>", self.update_value_from_entry)
+        self.value_entry.bind("<Return>", self.update_value_from_entry)
+        self.value_entry.bind("<FocusOut>", self.update_value_from_entry)
+
+        self.value_choice = ttk.Combobox(value_frame, textvariable=self.value_choice_var)
+        self.value_choice.grid(row=1, column=1, sticky="ew")
+        self.value_choice.bind("<<ComboboxSelected>>", self.update_value_from_choice)
+        self.value_choice.bind("<KeyRelease>", self.update_value_from_choice)
+        self.value_choice.bind("<Return>", self.update_value_from_choice)
+        self.value_choice.bind("<FocusOut>", self.update_value_from_choice)
+
+        self.value_text = tk.Text(value_frame, height=3, wrap=tk.WORD)
+        self.value_text.grid(row=1, column=1, sticky="ew")
+        self.value_text.bind("<KeyRelease>", self.update_value_from_text)
+        self.value_text.bind("<FocusOut>", self.update_value_from_text)
+
+        ttk.Button(value_frame, text="空にする", command=self.clear_current_value).grid(
+            row=1,
+            column=2,
+            sticky="e",
+            padx=(8, 4),
+        )
+        ttk.Button(value_frame, text="詳細編集", command=self.edit_selected_rule).grid(row=1, column=3, sticky="e")
+        self._show_value_widget("")
 
         bottom = ttk.Frame(self.root, padding=8)
         bottom.pack(side=tk.BOTTOM, fill=tk.BOTH)
@@ -371,8 +414,10 @@ class MainApplication:
         self.refresh_tree()
 
     def add_rule(self) -> None:
+        new_index = len(self.rules)
         self.rules.append(FillRule.empty())
         self.refresh_tree()
+        self.select_rule_by_index(new_index)
 
     def delete_rule(self) -> None:
         indexes = self._selected_indexes()
@@ -401,11 +446,12 @@ class MainApplication:
         self.tree.selection_set(item_id)
         self.tree.focus(item_id)
         if self._column_name(column_id) == "value":
+            self.focus_current_value_editor()
             return "break"
         self.edit_rule_by_item_id(item_id)
         return "break"
 
-    def edit_value_at_event(self, event: tk.Event) -> str | None:
+    def focus_value_editor_at_event(self, event: tk.Event) -> str | None:
         item_id = self.tree.identify_row(event.y)
         if not item_id:
             return None
@@ -414,98 +460,144 @@ class MainApplication:
             return None
         self.tree.selection_set(item_id)
         self.tree.focus(item_id)
-        if self.inline_value_editor is not None and self.inline_value_item_id == item_id:
-            return "break"
-        self.start_inline_value_edit(item_id, open_choices=True, save_existing=True)
+        self.load_value_editor_by_item_id(item_id)
+        self.focus_current_value_editor()
         return "break"
 
-    def edit_selected_value_inline(self, _event: tk.Event | None = None) -> str | None:
+    def focus_selected_value_editor(self, _event: tk.Event | None = None) -> str | None:
         item_id = self.tree.focus()
         if not item_id:
             selected = self.tree.selection()
             item_id = selected[0] if selected else ""
         if item_id:
-            self.start_inline_value_edit(item_id, open_choices=True, save_existing=True)
+            self.load_value_editor_by_item_id(item_id)
+            self.focus_current_value_editor()
             return "break"
         return None
 
-    def start_inline_value_edit(self, item_id: str, open_choices: bool = False, save_existing: bool = False) -> None:
-        self.close_inline_value_editor(save=save_existing)
-        try:
-            index = int(item_id)
-        except ValueError:
-            return
-        if index < 0 or index >= len(self.rules):
-            return
-
-        cell_box = self.tree.bbox(item_id, "value")
-        if not cell_box:
-            return
-        x, y, width, height = cell_box
-        self.inline_value_item_id = item_id
-        value_options = self._inline_value_options(self.rules[index])
-        self.inline_value_by_display = {display: value for display, value in value_options}
-        if value_options:
-            displays = [display for display, _value in value_options]
-            self.inline_value_editor = ttk.Combobox(self.tree, values=displays, state="readonly")
-            self.inline_value_editor.set(self._display_for_inline_value(self.rules[index].value, displays))
-            self.inline_value_editor.bind("<<ComboboxSelected>>", lambda _event: self.close_inline_value_editor(save=True))
-            if open_choices:
-                self.root.after(60, self.open_inline_value_choices)
+    def load_value_editor_from_selection(self, _event: tk.Event | None = None) -> None:
+        item_id = self.tree.focus()
+        if not item_id:
+            selected = self.tree.selection()
+            item_id = selected[0] if selected else ""
+        if item_id:
+            self.load_value_editor_by_item_id(item_id)
         else:
-            self.inline_value_editor = ttk.Entry(self.tree)
-            self.inline_value_editor.insert(0, self.rules[index].value)
-            self.inline_value_editor.select_range(0, tk.END)
-        self.inline_value_editor.place(x=x, y=y, width=width, height=height)
-        self.inline_value_editor.focus_set()
-        self.inline_value_editor.bind("<Return>", lambda _event: self.close_inline_value_editor(save=True))
-        self.inline_value_editor.bind("<Escape>", lambda _event: self.close_inline_value_editor(save=False))
-        self.inline_value_editor.bind("<FocusOut>", lambda _event: self.close_inline_value_editor(save=True))
+            self.clear_value_editor()
 
-    def open_inline_value_choices(self) -> None:
-        editor = self.inline_value_editor
-        if not isinstance(editor, ttk.Combobox):
-            return
-        try:
-            self.root.tk.call("ttk::combobox::Post", str(editor))
-        except tk.TclError:
-            editor.event_generate("<Button-1>")
-
-    def close_inline_value_editor(self, save: bool) -> None:
-        editor = self.inline_value_editor
-        item_id = self.inline_value_item_id
-        if editor is None:
-            return
-
-        displayed_value = editor.get()
-        value = self.inline_value_by_display.get(displayed_value, displayed_value)
-        self.unpost_inline_value_choices()
-        self.inline_value_editor = None
-        self.inline_value_item_id = ""
-        self.inline_value_by_display = {}
-        editor.destroy()
-
-        if not save:
-            return
+    def load_value_editor_by_item_id(self, item_id: str) -> None:
         try:
             index = int(item_id)
         except ValueError:
+            self.clear_value_editor()
             return
         if index < 0 or index >= len(self.rules):
+            self.clear_value_editor()
             return
-        self.rules[index].value = value
+
+        rule = self.rules[index]
+        self.current_value_rule_index = index
+        self.value_editor_loading = True
+        self.value_editor_target_var.set(f"{rule.label or rule.selector or '(no label)'}  /  {rule.kind}  /  {rule.selector}")
+        self.value_choice_by_display = {}
+
+        value_options = self._choice_value_options(rule)
+        if value_options:
+            self.value_choice_by_display = {display: value for display, value in value_options}
+            displays = [display for display, _value in value_options]
+            self.value_choice.configure(values=displays)
+            self.value_choice.configure(state="readonly" if rule.kind == "checkbox" else "normal")
+            self.value_choice_var.set(self._display_for_value(rule.value, displays))
+            self._show_value_widget("choice")
+        elif rule.kind in {"textarea", "contenteditable"} or "\n" in rule.value:
+            self.value_text.delete("1.0", tk.END)
+            self.value_text.insert("1.0", rule.value)
+            self._show_value_widget("text")
+        else:
+            self.value_entry_var.set(rule.value)
+            self._show_value_widget("entry")
+        self.value_editor_loading = False
+
+    def clear_value_editor(self) -> None:
+        self.current_value_rule_index = None
+        self.value_editor_loading = True
+        self.value_editor_target_var.set("行を選択してください")
+        self.value_entry_var.set("")
+        self.value_choice_var.set("")
+        self.value_choice_by_display = {}
+        self.value_text.delete("1.0", tk.END)
+        self._show_value_widget("")
+        self.value_editor_loading = False
+
+    def focus_current_value_editor(self) -> None:
+        if self.value_choice.winfo_ismapped():
+            self.value_choice.focus_set()
+            return
+        if self.value_text.winfo_ismapped():
+            self.value_text.focus_set()
+            return
+        if self.value_entry.winfo_ismapped():
+            self.value_entry.focus_set()
+            self.value_entry.select_range(0, tk.END)
+
+    def update_value_from_entry(self, _event: tk.Event | None = None) -> str | None:
+        if self.value_editor_loading:
+            return None
+        self.update_current_rule_value(self.value_entry_var.get())
+        return None
+
+    def update_value_from_choice(self, _event: tk.Event | None = None) -> str | None:
+        if self.value_editor_loading:
+            return None
+        displayed_value = self.value_choice_var.get()
+        value = self.value_choice_by_display.get(displayed_value, displayed_value)
+        self.update_current_rule_value(value)
+        return None
+
+    def update_value_from_text(self, _event: tk.Event | None = None) -> str | None:
+        if self.value_editor_loading:
+            return None
+        self.update_current_rule_value(self.value_text.get("1.0", "end-1c"))
+        return None
+
+    def update_current_rule_value(self, value: str) -> None:
+        index = self.current_value_rule_index
+        if index is None or index < 0 or index >= len(self.rules):
+            return
+        rule = self.rules[index]
+        if rule.value == value:
+            return
+        rule.value = value
+        if rule.kind == "checkbox":
+            normalized = value.strip().lower()
+            if normalized in {"true", "1", "yes", "y", "on", "checked", "check", "選択", "はい"}:
+                rule.checked = True
+            elif normalized in {"false", "0", "no", "n", "off", "unchecked", "uncheck", "未選択", "いいえ"}:
+                rule.checked = False
         self._update_tree_row(index)
 
-    def unpost_inline_value_choices(self) -> None:
-        editor = self.inline_value_editor
-        if not isinstance(editor, ttk.Combobox):
+    def clear_current_value(self) -> None:
+        index = self.current_value_rule_index
+        if index is None or index < 0 or index >= len(self.rules):
             return
-        try:
-            self.root.tk.call("ttk::combobox::Unpost", str(editor))
-        except tk.TclError:
-            pass
+        self.rules[index].value = ""
+        if self.rules[index].kind == "checkbox":
+            self.rules[index].checked = None
+        self._update_tree_row(index)
+        self.load_value_editor_by_item_id(str(index))
 
-    def _inline_value_options(self, rule: FillRule) -> list[tuple[str, str]]:
+    def _show_value_widget(self, widget_name: str) -> None:
+        self.value_entry.grid_remove()
+        self.value_choice.grid_remove()
+        self.value_text.grid_remove()
+        if widget_name == "entry":
+            self.value_entry.grid()
+        elif widget_name == "choice":
+            self.value_choice.grid()
+        elif widget_name == "text":
+            self.value_text.grid()
+
+    def _choice_value_options(self, rule: FillRule) -> list[tuple[str, str]]:
         if rule.kind == "checkbox":
             return self._display_value_options(self._unique_options(["true", "false", *rule.value_options]))
         if rule.kind == "select":
@@ -527,11 +619,11 @@ class MainApplication:
                 options.append((value, value))
         return options
 
-    def _display_for_inline_value(self, value: str, displays: list[str]) -> str:
-        for display, option_value in self.inline_value_by_display.items():
+    def _display_for_value(self, value: str, displays: list[str]) -> str:
+        for display, option_value in self.value_choice_by_display.items():
             if option_value == value:
                 return display
-        return displays[0] if displays else value
+        return value or (displays[0] if displays else "")
 
     def _unique_options(self, values: list[str], keep_empty: bool = False) -> list[str]:
         options: list[str] = []
@@ -564,6 +656,7 @@ class MainApplication:
         if dialog.result is not None:
             self.rules[index] = dialog.result
             self.refresh_tree()
+            self.select_rule_by_index(index)
 
     def generate_bookmarklet(self, inspect_only: bool) -> None:
         enabled_rules = [rule for rule in self.rules if rule.enabled]
@@ -582,7 +675,7 @@ class MainApplication:
         self.generated_bookmarklet = self.builder.build_extract_bookmarklet()
         self._set_bookmarklet_text(self.generated_bookmarklet)
         self.clipboard.copy(self.generated_bookmarklet)
-        messagebox.showinfo("コピー", "入力値抽出Bookmarkletを生成し、クリップボードにコピーしました。")
+        messagebox.showinfo("コピー", "入力欄読取Bookmarkletを生成し、クリップボードにコピーしました。")
 
     def copy_bookmarklet(self) -> None:
         text = self.bookmarklet_text.get("1.0", "end-1c")
@@ -612,7 +705,7 @@ class MainApplication:
                 self.rules.append(new_rule)
 
     def refresh_tree(self) -> None:
-        self.close_inline_value_editor(save=True)
+        self.clear_value_editor()
         self.tree.delete(*self.tree.get_children())
         for index, rule in enumerate(self.rules):
             self.tree.insert(
@@ -621,6 +714,15 @@ class MainApplication:
                 iid=str(index),
                 values=self._tree_values_for_rule(rule),
             )
+
+    def select_rule_by_index(self, index: int) -> None:
+        item_id = str(index)
+        if not self.tree.exists(item_id):
+            return
+        self.tree.selection_set(item_id)
+        self.tree.focus(item_id)
+        self.tree.see(item_id)
+        self.load_value_editor_by_item_id(item_id)
 
     def _update_tree_row(self, index: int) -> None:
         item_id = str(index)

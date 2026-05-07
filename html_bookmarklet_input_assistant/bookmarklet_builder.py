@@ -68,6 +68,14 @@ class BookmarkletBuilder:
               return [fallbackElement];
             }}
           }}
+          function radioCandidatesFor(rule, fallbackElement) {{
+            if (fallbackElement && fallbackElement.name) {{
+              const grouped = Array.from(document.querySelectorAll('input[type="radio"]'))
+                .filter(candidate => candidate.name === fallbackElement.name);
+              if (grouped.length) return grouped;
+            }}
+            return candidatesFor(rule, fallbackElement);
+          }}
           function applyCheckbox(rule, element) {{
             const valueState = checkboxStateFromValue(rule.value);
             if (valueState !== null) {{
@@ -84,7 +92,7 @@ class BookmarkletBuilder:
             const requestedValue = String(rule.value || "");
             let target = element;
             if (requestedValue !== "") {{
-              target = candidatesFor(rule, element).find(candidate => candidate.value === requestedValue) || null;
+              target = radioCandidatesFor(rule, element).find(candidate => candidate.value === requestedValue) || null;
               if (!target) return false;
               target.checked = true;
             }} else if (rule.checked !== null && rule.checked !== undefined) {{
