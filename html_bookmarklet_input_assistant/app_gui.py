@@ -219,6 +219,7 @@ class MainApplication:
         self.generated_bookmarklet = ""
         self.inline_value_editor: tk.Widget | None = None
         self.inline_value_item_id = ""
+        self.inline_value_by_display: dict[str, str] = {}
 
         self.parser = HtmlFormParser()
         self.yaml_service = FormSettingsYaml()
@@ -442,9 +443,11 @@ class MainApplication:
         x, y, width, height = cell_box
         self.inline_value_item_id = item_id
         value_options = self._inline_value_options(self.rules[index])
+        self.inline_value_by_display = {display: value for display, value in value_options}
         if value_options:
-            self.inline_value_editor = ttk.Combobox(self.tree, values=value_options, state="readonly")
-            self.inline_value_editor.set(self.rules[index].value if self.rules[index].value else value_options[0])
+            displays = [display for display, _value in value_options]
+            self.inline_value_editor = ttk.Combobox(self.tree, values=displays, state="readonly")
+            self.inline_value_editor.set(self._display_for_inline_value(self.rules[index].value, displays))
             self.inline_value_editor.bind("<<ComboboxSelected>>", lambda _event: self.close_inline_value_editor(save=True))
             if open_choices:
                 self.root.after(60, self.open_inline_value_choices)
@@ -473,9 +476,12 @@ class MainApplication:
         if editor is None:
             return
 
-        value = editor.get()
+        displayed_value = editor.get()
+        value = self.inline_value_by_display.get(displayed_value, displayed_value)
+        self.unpost_inline_value_choices()
         self.inline_value_editor = None
         self.inline_value_item_id = ""
+        self.inline_value_by_display = {}
         editor.destroy()
 
         if not save:
@@ -489,14 +495,42 @@ class MainApplication:
         self.rules[index].value = value
         self._update_tree_row(index)
 
-    def _inline_value_options(self, rule: FillRule) -> list[str]:
+    def unpost_inline_value_choices(self) -> None:
+        editor = self.inline_value_editor
+        if not isinstance(editor, ttk.Combobox):
+            return
+        try:
+            self.root.tk.call("ttk::combobox::Unpost", str(editor))
+        except tk.TclError:
+            pass
+
+    def _inline_value_options(self, rule: FillRule) -> list[tuple[str, str]]:
         if rule.kind == "checkbox":
-            return self._unique_options(["true", "false", *rule.value_options])
+            return self._display_value_options(self._unique_options(["true", "false", *rule.value_options]))
         if rule.kind == "select":
-            return self._unique_options([*rule.value_options, rule.value], keep_empty=True)
+            values = self._unique_options([*rule.value_options, rule.value], keep_empty=True)
+            non_empty_values = [value for value in values if value != ""]
+            if not non_empty_values:
+                return []
+            return self._display_value_options(values, show_empty_label=True)
         if rule.kind == "radio":
-            return self._unique_options([*rule.value_options, rule.value])
+            return self._display_value_options(self._unique_options([*rule.value_options, rule.value]))
         return []
+
+    def _display_value_options(self, values: list[str], show_empty_label: bool = False) -> list[tuple[str, str]]:
+        options: list[tuple[str, str]] = []
+        for value in values:
+            if value == "" and show_empty_label:
+                options.append(("(空)", value))
+            elif value != "":
+                options.append((value, value))
+        return options
+
+    def _display_for_inline_value(self, value: str, displays: list[str]) -> str:
+        for display, option_value in self.inline_value_by_display.items():
+            if option_value == value:
+                return display
+        return displays[0] if displays else value
 
     def _unique_options(self, values: list[str], keep_empty: bool = False) -> list[str]:
         options: list[str] = []
