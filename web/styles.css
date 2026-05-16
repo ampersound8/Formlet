@@ -76,7 +76,8 @@ button:hover {
 }
 
 .header-actions,
-.toolbar {
+.toolbar,
+.output-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -198,10 +199,6 @@ tr.selected {
   min-width: 0;
 }
 
-.value-control > * {
-  display: block;
-}
-
 .details-grid {
   align-items: center;
   display: grid;
@@ -213,9 +210,9 @@ tr.selected {
   justify-self: start;
 }
 
-.value-card input[type="text"],
-.value-card select,
-.value-card textarea,
+.value-control input[type="text"],
+.value-control select,
+.value-control textarea,
 .details-grid input[type="text"],
 .details-grid select,
 .output-section textarea {
@@ -227,7 +224,7 @@ tr.selected {
   width: 100%;
 }
 
-.value-card textarea,
+.value-control textarea,
 .output-section textarea {
   resize: vertical;
 }
@@ -240,7 +237,7 @@ tr.selected {
   font-weight: 650;
 }
 
-.output-header button {
+.output-actions button {
   min-width: 92px;
 }
 

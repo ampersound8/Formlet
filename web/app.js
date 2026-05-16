@@ -36,7 +36,6 @@ function bindElements() {
     "generateFillButton",
     "generateInspectButton",
     "generateExtractButton",
-    "copyBookmarkletButton",
     "copyBookmarkletInlineButton",
     "htmlFileInput",
     "settingsFileInput",
@@ -45,9 +44,7 @@ function bindElements() {
     "selectedRuleText",
     "emptyEditorHint",
     "editorForm",
-    "valueInput",
-    "valueSelect",
-    "valueTextarea",
+    "valueControlHost",
     "clearValueButton",
     "labelInput",
     "selectorInput",
@@ -73,19 +70,11 @@ function bindEvents() {
   elements.generateFillButton.addEventListener("click", () => generateBookmarklet(false));
   elements.generateInspectButton.addEventListener("click", () => generateBookmarklet(true));
   elements.generateExtractButton.addEventListener("click", generateExtractBookmarklet);
-  elements.copyBookmarkletButton.addEventListener("click", copyBookmarklet);
   elements.copyBookmarkletInlineButton.addEventListener("click", copyBookmarklet);
   elements.htmlFileInput.addEventListener("change", handleHtmlFile);
   elements.settingsFileInput.addEventListener("change", handleSettingsFile);
   elements.extractedFileInput.addEventListener("change", handleExtractedFile);
   elements.clearValueButton.addEventListener("click", clearCurrentValue);
-
-  elements.valueInput.addEventListener("input", () => updateCurrentValue(elements.valueInput.value));
-  elements.valueSelect.addEventListener("input", () => {
-    const displayedValue = elements.valueSelect.value;
-    updateCurrentValue(state.choiceValueByDisplay.get(displayedValue) ?? displayedValue);
-  });
-  elements.valueTextarea.addEventListener("input", () => updateCurrentValue(elements.valueTextarea.value));
 
   elements.labelInput.addEventListener("input", updateSelectedRuleFields);
   elements.selectorInput.addEventListener("input", updateSelectedRuleFields);
@@ -265,14 +254,11 @@ function loadSelectedRuleEditor() {
     elements.selectedRuleText.textContent = "行を選択してください";
     elements.emptyEditorHint.classList.remove("hidden");
     elements.editorForm.classList.add("hidden");
-    elements.valueInput.value = "";
-    elements.valueSelect.innerHTML = "";
-    elements.valueTextarea.value = "";
+    elements.valueControlHost.innerHTML = "";
     elements.labelInput.value = "";
     elements.selectorInput.value = "";
     elements.enabledInput.checked = false;
     elements.noteInput.value = "";
-    showValueControl("");
     state.loadingEditor = false;
     return;
   }
@@ -290,23 +276,51 @@ function loadSelectedRuleEditor() {
   const choices = choiceOptionsForRule(rule);
   if (choices.length) {
     state.choiceValueByDisplay = new Map(choices);
-    fillSelect(elements.valueSelect, choices);
-    elements.valueSelect.value = displayForValue(rule.value, choices);
-    showValueControl("select");
+    renderValueSelect(rule, choices);
   } else if (rule.kind === "textarea" || rule.kind === "contenteditable" || String(rule.value).includes("\n")) {
-    elements.valueTextarea.value = rule.value;
-    showValueControl("textarea");
+    renderValueTextarea(rule);
   } else {
-    elements.valueInput.value = rule.value;
-    showValueControl("input");
+    renderValueInput(rule);
   }
   state.loadingEditor = false;
 }
 
-function showValueControl(name) {
-  elements.valueInput.classList.toggle("hidden", name !== "input");
-  elements.valueSelect.classList.toggle("hidden", name !== "select");
-  elements.valueTextarea.classList.toggle("hidden", name !== "textarea");
+function renderValueInput(rule) {
+  elements.valueControlHost.innerHTML = "";
+  const input = document.createElement("input");
+  input.id = "valueInput";
+  input.type = "text";
+  input.autocomplete = "off";
+  input.value = rule.value;
+  input.addEventListener("input", () => updateCurrentValue(input.value));
+  elements.valueControlHost.appendChild(input);
+}
+
+function renderValueSelect(rule, choices) {
+  elements.valueControlHost.innerHTML = "";
+  const select = document.createElement("select");
+  select.id = "valueSelect";
+  fillSelect(select, choices);
+  select.value = displayForValue(rule.value, choices);
+  select.addEventListener("input", () => {
+    const displayedValue = select.value;
+    updateCurrentValue(state.choiceValueByDisplay.get(displayedValue) ?? displayedValue);
+  });
+  select.addEventListener("change", () => {
+    const displayedValue = select.value;
+    updateCurrentValue(state.choiceValueByDisplay.get(displayedValue) ?? displayedValue);
+  });
+  elements.valueControlHost.appendChild(select);
+}
+
+function renderValueTextarea(rule) {
+  elements.valueControlHost.innerHTML = "";
+  const textarea = document.createElement("textarea");
+  textarea.id = "valueTextarea";
+  textarea.rows = 4;
+  textarea.value = rule.value;
+  textarea.addEventListener("input", () => updateCurrentValue(textarea.value));
+  elements.valueControlHost.appendChild(textarea);
 }
 
 function choiceOptionsForRule(rule) {
@@ -350,6 +364,7 @@ function updateSelectedRuleFields() {
   if (state.loadingEditor) return;
   const rule = currentRule();
   if (!rule) return;
+  const previousKind = rule.kind;
   rule.label = elements.labelInput.value;
   rule.selector = elements.selectorInput.value;
   rule.kind = elements.kindSelect.value;
@@ -357,6 +372,7 @@ function updateSelectedRuleFields() {
   rule.enabled = elements.enabledInput.checked;
   rule.note = elements.noteInput.value;
   updateRuleRow(state.selectedIndex);
+  if (rule.kind !== previousKind) loadSelectedRuleEditor();
 }
 
 function updateRuleRow(index) {
