@@ -141,32 +141,83 @@ tr.selected {
   text-overflow: ellipsis;
 }
 
-.editor-title {
-  align-items: baseline;
+.section-header,
+.output-header {
+  align-items: center;
   display: flex;
-  gap: 10px;
+  justify-content: space-between;
   margin-bottom: 8px;
 }
 
-.editor-title span {
-  color: var(--muted);
+.section-header h2 {
+  font-size: 18px;
+  line-height: 1.2;
+  margin: 0 0 2px;
 }
 
-.editor-row {
+.section-header p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.empty-editor {
   align-items: center;
+  background: var(--background);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  display: flex;
+  min-height: 72px;
+  padding: 14px;
+}
+
+.editor-form {
+  display: grid;
+  gap: 12px;
+}
+
+.value-card {
+  align-items: end;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 8px;
   display: grid;
   gap: 8px;
-  grid-template-columns: auto minmax(240px, 1fr) auto;
-  margin-top: 8px;
+  grid-template-columns: auto minmax(260px, 1fr) auto;
+  padding: 10px;
 }
 
-.editor-row.secondary {
-  grid-template-columns: auto minmax(140px, 1fr) auto minmax(240px, 2fr) auto minmax(120px, 1fr) auto minmax(120px, 1fr);
+.value-card label,
+.details-grid label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
 }
 
-.editor-row input[type="text"],
-.editor-row select,
-.editor-row textarea,
+.value-control {
+  min-width: 0;
+}
+
+.value-control > * {
+  display: block;
+}
+
+.details-grid {
+  align-items: center;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: auto minmax(150px, 1fr) auto minmax(260px, 2fr) auto minmax(120px, 1fr) auto minmax(140px, 1fr);
+}
+
+.details-grid input[type="checkbox"] {
+  justify-self: start;
+}
+
+.value-card input[type="text"],
+.value-card select,
+.value-card textarea,
+.details-grid input[type="text"],
+.details-grid select,
 .output-section textarea {
   background: var(--background);
   border: 1px solid var(--border);
@@ -176,19 +227,21 @@ tr.selected {
   width: 100%;
 }
 
-.editor-row textarea,
+.value-card textarea,
 .output-section textarea {
   resize: vertical;
 }
 
 .hidden {
-  display: none;
+  display: none !important;
 }
 
-.output-section label {
-  display: block;
+.output-header label {
   font-weight: 650;
-  margin-bottom: 8px;
+}
+
+.output-header button {
+  min-width: 92px;
 }
 
 .status {
@@ -206,8 +259,8 @@ tr.selected {
     flex-direction: column;
   }
 
-  .editor-row,
-  .editor-row.secondary {
+  .value-card,
+  .details-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -52,37 +52,50 @@
     </section>
 
     <section class="editor-section" aria-label="選択行の編集">
-      <div class="editor-title">
-        <strong>value編集</strong>
-        <span id="selectedRuleText">行を選択してください</span>
+      <div class="section-header">
+        <div>
+          <h2>value編集</h2>
+          <p id="selectedRuleText">行を選択してください</p>
+        </div>
       </div>
-      <div class="editor-row">
-        <label for="valueInput">value</label>
-        <input id="valueInput" type="text" autocomplete="off">
-        <select id="valueSelect"></select>
-        <textarea id="valueTextarea" rows="3"></textarea>
-        <button id="clearValueButton" type="button">空にする</button>
+
+      <div id="emptyEditorHint" class="empty-editor">
+        表の行を選択すると、ここで value や selector を編集できます。
       </div>
-      <div class="editor-row secondary">
-        <label for="labelInput">label</label>
-        <input id="labelInput" type="text" autocomplete="off">
-        <label for="selectorInput">selector</label>
-        <input id="selectorInput" type="text" autocomplete="off">
-        <label for="kindSelect">kind</label>
-        <select id="kindSelect"></select>
-        <label for="modeSelect">mode</label>
-        <select id="modeSelect"></select>
-      </div>
-      <div class="editor-row secondary">
-        <label for="enabledInput">enabled</label>
-        <input id="enabledInput" type="checkbox">
-        <label for="noteInput">note</label>
-        <input id="noteInput" type="text" autocomplete="off">
+
+      <div id="editorForm" class="editor-form hidden">
+        <div class="value-card">
+          <label for="valueInput">value</label>
+          <div class="value-control">
+            <input id="valueInput" type="text" autocomplete="off">
+            <select id="valueSelect"></select>
+            <textarea id="valueTextarea" rows="4"></textarea>
+          </div>
+          <button id="clearValueButton" type="button">空にする</button>
+        </div>
+
+        <div class="details-grid">
+          <label for="labelInput">label</label>
+          <input id="labelInput" type="text" autocomplete="off">
+          <label for="selectorInput">selector</label>
+          <input id="selectorInput" type="text" autocomplete="off">
+          <label for="kindSelect">kind</label>
+          <select id="kindSelect"></select>
+          <label for="modeSelect">mode</label>
+          <select id="modeSelect"></select>
+          <label for="enabledInput">enabled</label>
+          <input id="enabledInput" type="checkbox">
+          <label for="noteInput">note</label>
+          <input id="noteInput" type="text" autocomplete="off">
+        </div>
       </div>
     </section>
 
     <section class="output-section" aria-label="生成Bookmarklet">
-      <label for="bookmarkletOutput">生成Bookmarklet</label>
+      <div class="output-header">
+        <label for="bookmarkletOutput">生成Bookmarklet</label>
+        <button id="copyBookmarkletInlineButton" type="button">コピー</button>
+      </div>
       <textarea id="bookmarkletOutput" rows="7" spellcheck="false"></textarea>
       <p id="statusText" class="status">準備完了</p>
     </section>

@@ -37,11 +37,14 @@ function bindElements() {
     "generateInspectButton",
     "generateExtractButton",
     "copyBookmarkletButton",
+    "copyBookmarkletInlineButton",
     "htmlFileInput",
     "settingsFileInput",
     "extractedFileInput",
     "rulesBody",
     "selectedRuleText",
+    "emptyEditorHint",
+    "editorForm",
     "valueInput",
     "valueSelect",
     "valueTextarea",
@@ -71,6 +74,7 @@ function bindEvents() {
   elements.generateInspectButton.addEventListener("click", () => generateBookmarklet(true));
   elements.generateExtractButton.addEventListener("click", generateExtractBookmarklet);
   elements.copyBookmarkletButton.addEventListener("click", copyBookmarklet);
+  elements.copyBookmarkletInlineButton.addEventListener("click", copyBookmarklet);
   elements.htmlFileInput.addEventListener("change", handleHtmlFile);
   elements.settingsFileInput.addEventListener("change", handleSettingsFile);
   elements.extractedFileInput.addEventListener("change", handleExtractedFile);
@@ -259,6 +263,8 @@ function loadSelectedRuleEditor() {
   state.choiceValueByDisplay = new Map();
   if (!rule) {
     elements.selectedRuleText.textContent = "行を選択してください";
+    elements.emptyEditorHint.classList.remove("hidden");
+    elements.editorForm.classList.add("hidden");
     elements.valueInput.value = "";
     elements.valueSelect.innerHTML = "";
     elements.valueTextarea.value = "";
@@ -271,6 +277,8 @@ function loadSelectedRuleEditor() {
     return;
   }
 
+  elements.emptyEditorHint.classList.add("hidden");
+  elements.editorForm.classList.remove("hidden");
   elements.selectedRuleText.textContent = `${rule.label || rule.selector || "(no label)"} / ${rule.kind} / ${rule.selector}`;
   elements.labelInput.value = rule.label;
   elements.selectorInput.value = rule.selector;
