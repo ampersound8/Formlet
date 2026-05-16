@@ -1,8 +1,25 @@
 # Formlet
 
-Formlet is a desktop GUI tool that analyzes saved HTML forms and generates bookmarklets for automatic form input.
+Formlet analyzes saved HTML forms and generates bookmarklets for automatic form input.
 
-## Requirements
+The repository now contains two local versions:
+
+- `web/`: browser-only local app built with HTML, CSS, and JavaScript.
+- `html_bookmarklet_input_assistant/`: Python + Tkinter desktop app.
+
+## Run Browser Version
+
+Open this file in your browser:
+
+```text
+web/index.html
+```
+
+The browser version works as a static local app. It reads saved HTML files, edits rules, imports extracted JSON, and generates bookmarklets without a server. Settings are saved and loaded as JSON.
+
+## Run Python Version
+
+### Requirements
 
 - Python 3.10+
 - Tkinter
@@ -14,7 +31,7 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-## Run
+### Start
 
 ```bash
 python3 html_bookmarklet_input_assistant/main.py
@@ -27,6 +44,6 @@ python3 html_bookmarklet_input_assistant/main.py
 3. Edit each rule's `value`, selector, kind, and mode as needed.
 4. Generate an inspection bookmarklet to verify selectors.
 5. Generate the input bookmarklet and run it on the target page.
-6. Save or reload rules as YAML.
+6. Save or reload rules. The browser version uses JSON; the Python version uses YAML.
 
 Sample files are available in `html_bookmarklet_input_assistant/settings/`.

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Formlet Web</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Formlet</h1>
+      <p>保存済みHTMLから入力欄を解析し、ローカルブラウザだけでBookmarkletを生成します。</p>
+    </div>
+    <div class="header-actions">
+      <button id="openHtmlButton" type="button">HTMLを開く</button>
+      <button id="loadSettingsButton" type="button">設定JSON読込</button>
+      <button id="saveSettingsButton" type="button">設定JSON保存</button>
+      <button id="loadExtractedButton" type="button">抽出JSON読込</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+    <section class="toolbar" aria-label="行操作">
+      <button id="addRuleButton" type="button">行追加</button>
+      <button id="duplicateRuleButton" type="button">行複製</button>
+      <button id="deleteRuleButton" type="button">行削除</button>
+      <button id="generateFillButton" type="button">Bookmarklet生成</button>
+      <button id="generateInspectButton" type="button">検査Bookmarklet生成</button>
+      <button id="generateExtractButton" type="button">入力欄読取Bookmarklet生成</button>
+      <button id="copyBookmarkletButton" type="button">コピー</button>
+    </section>
+
+    <section class="grid-section" aria-label="入力ルール一覧">
+      <table>
+        <thead>
+          <tr>
+            <th>enabled</th>
+            <th>label</th>
+            <th>selector</th>
+            <th>kind</th>
+            <th>value</th>
+            <th>mode</th>
+            <th>confidence</th>
+            <th>source</th>
+            <th>note</th>
+          </tr>
+        </thead>
+        <tbody id="rulesBody"></tbody>
+      </table>
+    </section>
+
+    <section class="editor-section" aria-label="選択行の編集">
+      <div class="editor-title">
+        <strong>value編集</strong>
+        <span id="selectedRuleText">行を選択してください</span>
+      </div>
+      <div class="editor-row">
+        <label for="valueInput">value</label>
+        <input id="valueInput" type="text" autocomplete="off">
+        <select id="valueSelect"></select>
+        <textarea id="valueTextarea" rows="3"></textarea>
+        <button id="clearValueButton" type="button">空にする</button>
+      </div>
+      <div class="editor-row secondary">
+        <label for="labelInput">label</label>
+        <input id="labelInput" type="text" autocomplete="off">
+        <label for="selectorInput">selector</label>
+        <input id="selectorInput" type="text" autocomplete="off">
+        <label for="kindSelect">kind</label>
+        <select id="kindSelect"></select>
+        <label for="modeSelect">mode</label>
+        <select id="modeSelect"></select>
+      </div>
+      <div class="editor-row secondary">
+        <label for="enabledInput">enabled</label>
+        <input id="enabledInput" type="checkbox">
+        <label for="noteInput">note</label>
+        <input id="noteInput" type="text" autocomplete="off">
+      </div>
+    </section>
+
+    <section class="output-section" aria-label="生成Bookmarklet">
+      <label for="bookmarkletOutput">生成Bookmarklet</label>
+      <textarea id="bookmarkletOutput" rows="7" spellcheck="false"></textarea>
+      <p id="statusText" class="status">準備完了</p>
+    </section>
+  </main>
+
+  <input id="htmlFileInput" type="file" accept=".html,.htm,text/html" hidden>
+  <input id="settingsFileInput" type="file" accept=".json,application/json" hidden>
+  <input id="extractedFileInput" type="file" accept=".json,application/json" hidden>
+</body>
+</html>
