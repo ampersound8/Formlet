@@ -134,21 +134,7 @@ function parseHtmlToRules(html) {
   const elementsList = [...documentObject.querySelectorAll("input, textarea, select")]
     .filter(element => !EXCLUDED_INPUT_TYPES.has((element.getAttribute("type") || "text").toLowerCase()));
   const parsed = elementsList.map(element => formElementToRule(documentObject, element));
-  const radioOptionsByName = new Map();
-
-  for (const rule of parsed) {
-    if (rule.kind !== "radio" || !rule.name || !rule.initialValue) continue;
-    if (!radioOptionsByName.has(rule.name)) radioOptionsByName.set(rule.name, []);
-    const options = radioOptionsByName.get(rule.name);
-    if (!options.includes(rule.initialValue)) options.push(rule.initialValue);
-  }
-
-  for (const rule of parsed) {
-    if (rule.kind === "radio" && radioOptionsByName.has(rule.name)) {
-      rule.valueOptions = [...radioOptionsByName.get(rule.name)];
-    }
-  }
-  return parsed;
+  return mergeRadioRules(parsed);
 }
 
 function formElementToRule(documentObject, element) {
@@ -185,8 +171,11 @@ function formElementToRule(documentObject, element) {
 function selectorForElement(element) {
   const tag = element.tagName.toLowerCase();
   const type = (element.getAttribute("type") || (tag === "select" ? "select" : tag)).toLowerCase();
+  if (type === "radio" && element.name) {
+    return { selector: `${tag}[name="${cssAttributeEscape(element.name)}"]`, confidence: "medium" };
+  }
   if (element.id) return { selector: `#${cssIdentifierEscape(element.id)}`, confidence: "high" };
-  if ((type === "checkbox" || type === "radio") && element.name && element.hasAttribute("value")) {
+  if (type === "checkbox" && element.name && element.hasAttribute("value")) {
     return {
       selector: `${tag}[name="${cssAttributeEscape(element.name)}"][value="${cssAttributeEscape(element.value || "")}"]`,
       confidence: "medium",
@@ -217,6 +206,32 @@ function kindForElement(tag, inputType) {
   if (inputType === "checkbox") return "checkbox";
   if (inputType === "radio") return "radio";
   return "text";
+}
+
+function mergeRadioRules(rules) {
+  const result = [];
+  const radioBySelector = new Map();
+  for (const rule of rules) {
+    if (rule.kind !== "radio") {
+      result.push(rule);
+      continue;
+    }
+    const key = rule.selector || rule.name;
+    const existing = radioBySelector.get(key);
+    if (!existing) {
+      radioBySelector.set(key, rule);
+      result.push(rule);
+    } else {
+      for (const value of rule.valueOptions || []) {
+        if (value && !existing.valueOptions.includes(value)) existing.valueOptions.push(value);
+      }
+      if (rule.checked) {
+        existing.checked = true;
+        existing.value = rule.initialValue || existing.value;
+      }
+    }
+  }
+  return result;
 }
 
 function renderRules() {
@@ -485,8 +500,8 @@ function rulesFromExtractedJson(data) {
     const value = String(item.value || "");
     const name = String(item.name || "");
     let selector = String(item.selector || "");
-    if (type === "radio" && name && value && !selector.includes("[value=")) {
-      selector = `input[name="${cssAttributeEscape(name)}"][value="${cssAttributeEscape(value)}"]`;
+    if (type === "radio" && name) {
+      selector = `input[name="${cssAttributeEscape(name)}"]`;
     } else if (type === "checkbox" && name && value && item.hasValueAttribute === true && !selector.includes("[value=")) {
       selector = `input[name="${cssAttributeEscape(name)}"][value="${cssAttributeEscape(value)}"]`;
     }
@@ -498,6 +513,7 @@ function rulesFromExtractedJson(data) {
       value,
       checked: item.checked === true ? true : item.checked === false ? false : null,
       source: "extracted",
+      valueOptions: type === "radio" && value ? [value] : [],
     };
   });
 }
