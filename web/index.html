@@ -50,22 +50,16 @@
     <section class="editor-section" aria-label="選択行の編集">
       <div class="section-header">
         <div>
-          <h2>value編集</h2>
+          <h2>詳細編集</h2>
           <p id="selectedRuleText">行を選択してください</p>
         </div>
       </div>
 
       <div id="emptyEditorHint" class="empty-editor">
-        表の行を選択すると、ここで value や selector を編集できます。
+        表の行を選択すると、ここで selector や kind を編集できます。value は一覧の value 列で直接編集します。
       </div>
 
       <div id="editorForm" class="editor-form hidden">
-        <div class="value-card">
-          <label for="valueControlHost">value</label>
-          <div id="valueControlHost" class="value-control"></div>
-          <button id="clearValueButton" type="button">空にする</button>
-        </div>
-
         <div class="details-grid">
           <label for="labelInput">label</label>
           <input id="labelInput" type="text" autocomplete="off">

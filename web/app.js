@@ -44,8 +44,6 @@ function bindElements() {
     "selectedRuleText",
     "emptyEditorHint",
     "editorForm",
-    "valueControlHost",
-    "clearValueButton",
     "labelInput",
     "selectorInput",
     "kindSelect",
@@ -74,8 +72,6 @@ function bindEvents() {
   elements.htmlFileInput.addEventListener("change", handleHtmlFile);
   elements.settingsFileInput.addEventListener("change", handleSettingsFile);
   elements.extractedFileInput.addEventListener("change", handleExtractedFile);
-  elements.clearValueButton.addEventListener("click", clearCurrentValue);
-
   elements.labelInput.addEventListener("input", updateSelectedRuleFields);
   elements.selectorInput.addEventListener("input", updateSelectedRuleFields);
   elements.kindSelect.addEventListener("input", updateSelectedRuleFields);
@@ -226,24 +222,79 @@ function kindForElement(tag, inputType) {
 function renderRules() {
   elements.rulesBody.innerHTML = "";
   state.rules.forEach((rule, index) => {
-    const row = document.createElement("tr");
-    row.dataset.index = String(index);
-    row.className = index === state.selectedIndex ? "selected" : "";
-    row.addEventListener("click", () => selectRule(index));
-    tableValuesForRule(rule).forEach((value, cellIndex) => {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      if (cellIndex === 4) cell.className = "value-cell";
-      row.appendChild(cell);
-    });
-    elements.rulesBody.appendChild(row);
+    elements.rulesBody.appendChild(buildRuleRow(rule, index));
   });
   loadSelectedRuleEditor();
 }
 
-function selectRule(index) {
+function buildRuleRow(rule, index) {
+  const row = document.createElement("tr");
+  row.dataset.index = String(index);
+  row.className = index === state.selectedIndex ? "selected" : "";
+  row.addEventListener("click", () => selectRule(index));
+  tableValuesForRule(rule).forEach((value, cellIndex) => {
+    const cell = document.createElement("td");
+    if (cellIndex === 4) {
+      cell.className = "value-cell";
+      renderValueCell(cell, rule, index);
+    } else {
+      cell.textContent = value;
+    }
+    row.appendChild(cell);
+  });
+  return row;
+}
+
+function renderValueCell(cell, rule, index) {
+  const choices = choiceOptionsForRule(rule);
+  const control = choices.length ? buildTableValueSelect(rule, choices) : buildTableValueTextControl(rule);
+  for (const eventName of ["pointerdown", "click", "dblclick"]) {
+    control.addEventListener(eventName, event => event.stopPropagation());
+  }
+  control.addEventListener("focus", () => selectRule(index, { render: false }));
+  cell.appendChild(control);
+}
+
+function buildTableValueSelect(rule, choices) {
+  const select = document.createElement("select");
+  select.className = "table-value-select";
+  fillSelect(select, choices);
+  select.value = displayForValue(rule.value, choices);
+  const update = () => {
+    const displayedValue = select.value;
+    updateRuleValue(rule, new Map(choices).get(displayedValue) ?? displayedValue);
+  };
+  select.addEventListener("input", update);
+  select.addEventListener("change", update);
+  return select;
+}
+
+function buildTableValueTextControl(rule) {
+  const multiline = rule.kind === "textarea" || rule.kind === "contenteditable" || String(rule.value).includes("\n");
+  const control = multiline ? document.createElement("textarea") : document.createElement("input");
+  control.className = multiline ? "table-value-textarea" : "table-value-input";
+  if (!multiline) {
+    control.type = "text";
+    control.autocomplete = "off";
+  } else {
+    control.rows = 2;
+  }
+  control.value = rule.value;
+  control.addEventListener("input", () => updateRuleValue(rule, control.value));
+  return control;
+}
+
+function selectRule(index, options = {}) {
   state.selectedIndex = index;
-  renderRules();
+  markSelectedRow(index);
+  loadSelectedRuleEditor();
+  if (options.render) renderRules();
+}
+
+function markSelectedRow(index) {
+  for (const row of elements.rulesBody.querySelectorAll("tr")) {
+    row.classList.toggle("selected", row.dataset.index === String(index));
+  }
 }
 
 function loadSelectedRuleEditor() {
@@ -254,7 +305,6 @@ function loadSelectedRuleEditor() {
     elements.selectedRuleText.textContent = "行を選択してください";
     elements.emptyEditorHint.classList.remove("hidden");
     elements.editorForm.classList.add("hidden");
-    elements.valueControlHost.innerHTML = "";
     elements.labelInput.value = "";
     elements.selectorInput.value = "";
     elements.enabledInput.checked = false;
@@ -273,54 +323,7 @@ function loadSelectedRuleEditor() {
   elements.enabledInput.checked = Boolean(rule.enabled);
   elements.noteInput.value = rule.note || "";
 
-  const choices = choiceOptionsForRule(rule);
-  if (choices.length) {
-    state.choiceValueByDisplay = new Map(choices);
-    renderValueSelect(rule, choices);
-  } else if (rule.kind === "textarea" || rule.kind === "contenteditable" || String(rule.value).includes("\n")) {
-    renderValueTextarea(rule);
-  } else {
-    renderValueInput(rule);
-  }
   state.loadingEditor = false;
-}
-
-function renderValueInput(rule) {
-  elements.valueControlHost.innerHTML = "";
-  const input = document.createElement("input");
-  input.id = "valueInput";
-  input.type = "text";
-  input.autocomplete = "off";
-  input.value = rule.value;
-  input.addEventListener("input", () => updateCurrentValue(input.value));
-  elements.valueControlHost.appendChild(input);
-}
-
-function renderValueSelect(rule, choices) {
-  elements.valueControlHost.innerHTML = "";
-  const select = document.createElement("select");
-  select.id = "valueSelect";
-  fillSelect(select, choices);
-  select.value = displayForValue(rule.value, choices);
-  select.addEventListener("input", () => {
-    const displayedValue = select.value;
-    updateCurrentValue(state.choiceValueByDisplay.get(displayedValue) ?? displayedValue);
-  });
-  select.addEventListener("change", () => {
-    const displayedValue = select.value;
-    updateCurrentValue(state.choiceValueByDisplay.get(displayedValue) ?? displayedValue);
-  });
-  elements.valueControlHost.appendChild(select);
-}
-
-function renderValueTextarea(rule) {
-  elements.valueControlHost.innerHTML = "";
-  const textarea = document.createElement("textarea");
-  textarea.id = "valueTextarea";
-  textarea.rows = 4;
-  textarea.value = rule.value;
-  textarea.addEventListener("input", () => updateCurrentValue(textarea.value));
-  elements.valueControlHost.appendChild(textarea);
 }
 
 function choiceOptionsForRule(rule) {
@@ -347,9 +350,8 @@ function displayForValue(value, choices) {
   return choice ? choice[0] : value || choices[0]?.[0] || "";
 }
 
-function updateCurrentValue(value) {
+function updateRuleValue(rule, value) {
   if (state.loadingEditor) return;
-  const rule = currentRule();
   if (!rule) return;
   rule.value = value;
   if (rule.kind === "checkbox") {
@@ -357,7 +359,6 @@ function updateCurrentValue(value) {
     if (["true", "1", "yes", "y", "on", "checked", "check", "選択", "はい"].includes(normalized)) rule.checked = true;
     if (["false", "0", "no", "n", "off", "unchecked", "uncheck", "未選択", "いいえ"].includes(normalized)) rule.checked = false;
   }
-  updateRuleRow(state.selectedIndex);
 }
 
 function updateSelectedRuleFields() {
@@ -379,11 +380,7 @@ function updateRuleRow(index) {
   if (index == null || index < 0 || index >= state.rules.length) return;
   const row = elements.rulesBody.querySelector(`tr[data-index="${index}"]`);
   if (!row) return;
-  const values = tableValuesForRule(state.rules[index]);
-  [...row.children].forEach((cell, cellIndex) => {
-    cell.textContent = values[cellIndex] || "";
-  });
-  row.classList.toggle("selected", index === state.selectedIndex);
+  row.replaceWith(buildRuleRow(state.rules[index], index));
 }
 
 function tableValuesForRule(rule) {
