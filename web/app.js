@@ -362,18 +362,20 @@ function loadSelectedRuleEditor() {
 
 function choiceOptionsForRule(rule) {
   if (rule.kind === "checkbox") return displayValueOptions(uniqueOptions(["true", "false", ...(rule.valueOptions || [])]));
-  if (rule.kind === "radio") return displayValueOptions(uniqueOptions([...(rule.valueOptions || []), rule.value]));
+  if (rule.kind === "radio") {
+    return displayValueOptions(uniqueOptions(["", ...(rule.valueOptions || []), rule.value], true), true, "(無選択)");
+  }
   if (rule.kind === "select") {
     const values = uniqueOptions([...(rule.valueOptions || []), rule.value], true);
     if (!values.some(value => value !== "")) return [];
-    return displayValueOptions(values, true);
+    return displayValueOptions(values, true, "(空)");
   }
   return [];
 }
 
-function displayValueOptions(values, showEmpty = false) {
+function displayValueOptions(values, showEmpty = false, emptyLabel = "(空)") {
   return values.flatMap(value => {
-    if (value === "" && showEmpty) return [["(空)", ""]];
+    if (value === "" && showEmpty) return [[emptyLabel, ""]];
     if (value === "") return [];
     return [[value, value]];
   });
@@ -392,6 +394,8 @@ function updateRuleValue(rule, value) {
     const normalized = value.trim().toLowerCase();
     if (["true", "1", "yes", "y", "on", "checked", "check", "選択", "はい"].includes(normalized)) rule.checked = true;
     if (["false", "0", "no", "n", "off", "unchecked", "uncheck", "未選択", "いいえ"].includes(normalized)) rule.checked = false;
+  } else if (rule.kind === "radio") {
+    rule.checked = value !== "";
   }
 }
 
@@ -657,6 +661,12 @@ function buildFillBookmarklet(rules, inspectOnly) {
           target = radioCandidatesFor(rule, element).find(candidate => candidate.value === requestedValue) || null;
           if (!target) return false;
           target.checked = true;
+        } else if (rule.checked === false) {
+          for (const candidate of radioCandidatesFor(rule, element)) {
+            candidate.checked = false;
+            fire(candidate);
+          }
+          return true;
         } else if (rule.checked !== null && rule.checked !== undefined) target.checked = Boolean(rule.checked);
         else target.checked = true;
         fire(target);

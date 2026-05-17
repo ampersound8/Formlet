@@ -95,6 +95,12 @@ class BookmarkletBuilder:
               target = radioCandidatesFor(rule, element).find(candidate => candidate.value === requestedValue) || null;
               if (!target) return false;
               target.checked = true;
+            }} else if (rule.checked === false) {{
+              for (const candidate of radioCandidatesFor(rule, element)) {{
+                candidate.checked = false;
+                fire(candidate);
+              }}
+              return true;
             }} else if (rule.checked !== null && rule.checked !== undefined) {{
               target.checked = Boolean(rule.checked);
             }} else {{
