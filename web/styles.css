@@ -141,6 +141,16 @@ tr.selected {
   white-space: normal;
 }
 
+.enabled-cell {
+  text-align: center;
+  width: 80px;
+}
+
+.table-enabled-checkbox {
+  height: 18px;
+  width: 18px;
+}
+
 .section-header,
 .output-header {
   align-items: center;

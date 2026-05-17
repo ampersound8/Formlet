@@ -234,7 +234,10 @@ function buildRuleRow(rule, index) {
   row.addEventListener("click", () => selectRule(index));
   tableValuesForRule(rule).forEach((value, cellIndex) => {
     const cell = document.createElement("td");
-    if (cellIndex === 4) {
+    if (cellIndex === 0) {
+      cell.className = "enabled-cell";
+      renderEnabledCell(cell, rule, index);
+    } else if (cellIndex === 4) {
       cell.className = "value-cell";
       renderValueCell(cell, rule, index);
     } else {
@@ -243,6 +246,22 @@ function buildRuleRow(rule, index) {
     row.appendChild(cell);
   });
   return row;
+}
+
+function renderEnabledCell(cell, rule, index) {
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.className = "table-enabled-checkbox";
+  checkbox.checked = Boolean(rule.enabled);
+  for (const eventName of ["pointerdown", "click", "dblclick"]) {
+    checkbox.addEventListener(eventName, event => event.stopPropagation());
+  }
+  checkbox.addEventListener("focus", () => selectRule(index, { render: false }));
+  checkbox.addEventListener("change", () => {
+    rule.enabled = checkbox.checked;
+    if (index === state.selectedIndex) elements.enabledInput.checked = checkbox.checked;
+  });
+  cell.appendChild(checkbox);
 }
 
 function renderValueCell(cell, rule, index) {
